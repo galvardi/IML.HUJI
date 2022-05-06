@@ -1,10 +1,41 @@
-from IMLearn.learners.classifiers import Perceptron, LDA, GaussianNaiveBayes
-from typing import Tuple
-from utils import *
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from math import atan2, pi
+from math import atan2
 
+from numpy import pi
+
+from IMLearn.learners.classifiers import Perceptron, LDA, GaussianNaiveBayes
+import numpy as np
+from typing import Tuple
+import plotly.graph_objects as go
+import plotly.io as pio
+from IMLearn.metrics import accuracy
+
+from plotly.subplots import make_subplots
+
+pio.templates.default = "simple_white"
+pio.renderers.default = "browser"
+
+DIR_PATH = r"../datasets/"
+
+def get_ellipse(mu: np.ndarray, cov: np.ndarray):
+    """
+    Draw an ellipse centered at given location and according to specified covariance matrix
+    Parameters
+    ----------
+    mu : ndarray of shape (2,)
+        Center of ellipse
+    cov: ndarray of shape (2,2)
+        Covariance of Gaussian
+    Returns
+    -------
+        scatter: A plotly trace object of the ellipse
+    """
+    l1, l2 = tuple(np.linalg.eigvalsh(cov)[::-1])
+    theta = atan2(l1 - cov[0, 0], cov[0, 1]) if cov[0, 1] != 0 else (np.pi / 2 if cov[0, 0] < cov[1, 1] else 0)
+    t = np.linspace(0, 2 * np.pi, 100)
+    xs = (l1 * np.cos(theta) * np.cos(t)) - (l2 * np.sin(theta) * np.sin(t))
+    ys = (l1 * np.sin(theta) * np.cos(t)) + (l2 * np.cos(theta) * np.sin(t))
+
+    return go.Scatter(x=mu[0] + xs, y=mu[1] + ys, mode="lines", marker_color="black")
 
 def load_dataset(filename: str) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -25,8 +56,8 @@ def load_dataset(filename: str) -> Tuple[np.ndarray, np.ndarray]:
         Class vector specifying for each sample its class
 
     """
-    data = np.load(filename)
-    return data[:, :2], data[:, 2].astype(int)
+    data = np.load(DIR_PATH + filename)
+    return data[:, :2], data[:, 2]
 
 
 def run_perceptron():
@@ -36,41 +67,23 @@ def run_perceptron():
     Create a line plot that shows the perceptron algorithm's training loss values (y-axis)
     as a function of the training iterations (x-axis).
     """
-    for n, f in [("Linearly Separable", "linearly_separable.npy"), ("Linearly Inseparable", "linearly_inseparable.npy")]:
+
+    def callback_func(fit: Perceptron, x: np.ndarray, y: int):
+        losses.append(fit.loss(X, y_))
+
+    for n, f in [("Linearly Separable", "linearly_separable.npy"),
+                 ("Linearly Inseparable", "linearly_inseparable.npy")]:
         # Load dataset
-        raise NotImplementedError()
+        X, y_ = load_dataset(f)
 
         # Fit Perceptron and record loss in each fit iteration
         losses = []
-        raise NotImplementedError()
-
-        # Plot figure of loss as function of fitting iteration
-        raise NotImplementedError()
-
-
-def get_ellipse(mu: np.ndarray, cov: np.ndarray):
-    """
-    Draw an ellipse centered at given location and according to specified covariance matrix
-
-    Parameters
-    ----------
-    mu : ndarray of shape (2,)
-        Center of ellipse
-
-    cov: ndarray of shape (2,2)
-        Covariance of Gaussian
-
-    Returns
-    -------
-        scatter: A plotly trace object of the ellipse
-    """
-    l1, l2 = tuple(np.linalg.eigvalsh(cov)[::-1])
-    theta = atan2(l1 - cov[0, 0], cov[0, 1]) if cov[0, 1] != 0 else (np.pi / 2 if cov[0, 0] < cov[1, 1] else 0)
-    t = np.linspace(0, 2 * pi, 100)
-    xs = (l1 * np.cos(theta) * np.cos(t)) - (l2 * np.sin(theta) * np.sin(t))
-    ys = (l1 * np.sin(theta) * np.cos(t)) + (l2 * np.cos(theta) * np.sin(t))
-
-    return go.Scatter(x=mu[0] + xs, y=mu[1] + ys, mode="lines", marker_color="black")
+        percy = Perceptron(callback=callback_func)
+        percy.fit(X, y_)
+        fig1 = go.Figure(go.Scatter(x=list(range(len(losses))), y=losses))
+        fig1.update_layout(title=n, xaxis_title="Iteration",
+                          yaxis_title="Loss")
+        fig1.show()
 
 
 def compare_gaussian_classifiers():
@@ -79,26 +92,64 @@ def compare_gaussian_classifiers():
     """
     for f in ["gaussian1.npy", "gaussian2.npy"]:
         # Load dataset
-        raise NotImplementedError()
+        X, y_ = load_dataset(f)
 
         # Fit models and predict over training set
-        raise NotImplementedError()
+        lda = LDA()
+        lda.fit(X, y_)
+        lda_pred = lda.predict(X)
+        naive = GaussianNaiveBayes()
+        naive.fit(X,y_)
+        naive_pred = naive.predict(X)
 
-        # Plot a figure with two suplots, showing the Gaussian Naive Bayes predictions on the left and LDA predictions
-        # on the right. Plot title should specify dataset used and subplot titles should specify algorithm and accuracy
         # Create subplots
-        from IMLearn.metrics import accuracy
-        raise NotImplementedError()
+        naive_accuracy = accuracy(y_, naive_pred)
+        lda_accuracy = accuracy(y_, lda_pred)
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=(f"Gaussian Naive Bayes With Accuracy"
+                            f" - {naive_accuracy}",
+                            f"Linear discriminant analysis "
+                            f"With Accuracy - {lda_accuracy}"))
 
         # Add traces for data-points setting symbols and colors
-        raise NotImplementedError()
+        fig.add_trace(go.Scatter(x=X[:, 0], y=X[:, 1],
+                                 mode="markers", marker=dict(symbol=y_,
+                                                             color=naive_pred,
+                                                             size=8)),
+                      row=1, col=1)
+        fig.add_trace(go.Scatter(x=X[:, 0], y=X[:, 1],
+                                 mode="markers", marker=dict(symbol=y_,
+                                                             color=lda_pred,
+                                                             size=8)),
+                      row=1, col=2)
+
+        for i in range(3):
 
         # Add `X` dots specifying fitted Gaussians' means
-        raise NotImplementedError()
 
+            fig.add_trace(go.Scatter(x=[naive.mu_[i][0]], y=[naive.mu_[i][1]],
+                                     mode="markers",
+                                     marker=dict(color="black",
+                                                 symbol="x",
+                                                 size=10)),
+                          row=1, col=1)
+            fig.add_trace(go.Scatter(x=[lda.mu_[i][0]], y=[lda.mu_[i][1]],
+                                     mode="markers", marker=dict(
+                    color="black",
+                    symbol="x",
+                    size=10)),
+                          row=1, col=2)
         # Add ellipses depicting the covariances of the fitted Gaussians
-        raise NotImplementedError()
 
+            fig.add_trace(get_ellipse(naive.mu_[i],np.diag(naive.vars_[i])),
+                                      row=1,
+                          col=1)
+            fig.add_trace(get_ellipse(lda.mu_[i],lda.cov_),row=1,col=2)
+
+
+        fig.update_layout(title=f"{f} Dataset",showlegend=False)
+        fig.show()
 
 if __name__ == '__main__':
     np.random.seed(0)

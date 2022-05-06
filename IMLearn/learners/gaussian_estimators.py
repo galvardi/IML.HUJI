@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from math import sqrt
+
 import numpy as np
 from numpy.linalg import inv, det, slogdet
 
@@ -7,6 +10,7 @@ class UnivariateGaussian:
     """
     Class for univariate Gaussian Distribution Estimator
     """
+
     def __init__(self, biased_var: bool = False) -> UnivariateGaussian:
         """
         Estimator for univariate Gaussian mean and variance parameters
@@ -51,8 +55,11 @@ class UnivariateGaussian:
         Sets `self.mu_`, `self.var_` attributes according to calculated estimation (where
         estimator is either biased or unbiased). Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
-
+        self.mu_ = np.mean(X)
+        if self.biased_:
+            self.var_ = X.var(ddof=0)
+        else:
+            self.var_ = X.var(ddof=1)
         self.fitted_ = True
         return self
 
@@ -75,8 +82,10 @@ class UnivariateGaussian:
         ValueError: In case function was called prior fitting the model
         """
         if not self.fitted_:
-            raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+            raise ValueError(
+                "Estimator must first be fitted before calling `pdf` function")
+        exp = -1 * ((X - self.mu_) ** 2) / (2 * self.var_)
+        return (np.e ** exp) / sqrt(2 * self.var_ * np.pi)
 
     @staticmethod
     def log_likelihood(mu: float, sigma: float, X: np.ndarray) -> float:
@@ -97,13 +106,24 @@ class UnivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        raise NotImplementedError()
+        exp_expres = (-1 / (sigma * 2)) * np.sum((X - mu) ** 2)
+        liklyhood = (-len(X) / 2) * np.log(sigma * np.pi * 2) + exp_expres
+        return liklyhood
+
+
+def multi_gauss_pdf(samp, mu, cov):
+    cov_inv = np.linealg.inv(cov)
+    mat = samp - mu
+    return (np.e ** (-(np.matmul(np.transpose(mat), np.matmul(cov_inv,
+                                                              mat)) / 2)) /
+            sqrt((np.linalg.det(cov) * ((np.pi * 2) ** len(mu)))))
 
 
 class MultivariateGaussian:
     """
     Class for multivariate Gaussian Distribution Estimator
     """
+
     def __init__(self):
         """
         Initialize an instance of multivariate Gaussian estimator
@@ -143,7 +163,10 @@ class MultivariateGaussian:
         Sets `self.mu_`, `self.cov_` attributes according to calculated estimation.
         Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
+
+        self.mu_ = (X.sum(axis=0) / len(X))
+        self.cov_ = (np.matmul(np.transpose((X - self.mu_)),
+                               (X - self.mu_))) / (len(X) - 1)
 
         self.fitted_ = True
         return self
@@ -167,11 +190,13 @@ class MultivariateGaussian:
         ValueError: In case function was called prior fitting the model
         """
         if not self.fitted_:
-            raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+            raise ValueError(
+                "Estimator must first be fitted before calling `pdf` function")
+        return multi_gauss_pdf(X, self.mu_, self.cov_)
 
     @staticmethod
-    def log_likelihood(mu: np.ndarray, cov: np.ndarray, X: np.ndarray) -> float:
+    def log_likelihood(mu: np.ndarray, cov: np.ndarray,
+                       X: np.ndarray) -> float:
         """
         Calculate the log-likelihood of the data under a specified Gaussian model
 
@@ -189,4 +214,9 @@ class MultivariateGaussian:
         log_likelihood: float
             log-likelihood calculated over all input data and under given parameters of Gaussian
         """
-        raise NotImplementedError()
+        pdf_mat = -0.5 * ((X - mu) @ np.linalg.inv(cov) * (X - mu))
+        return ((len(X) * -len(mu)) / 2) * np.log(np.pi * 2) - (len(X) *
+                                                                np.log(
+                                                                    np.linalg.det(
+                                                                        cov)) / 2 + np.sum(
+                    pdf_mat))
