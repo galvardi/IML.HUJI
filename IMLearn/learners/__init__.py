@@ -4,3 +4,7 @@ __all__ = ["UnivariateGaussian",
            "MultivariateGaussian",
            "regressors",
            "classifiers"]
+
+
+def metalearners():
+    return None
