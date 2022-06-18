@@ -11,7 +11,7 @@ OUTPUT_VECTOR_TYPE = ["last", "best", "average"]
 def default_callback(model: GradientDescent, **kwargs) -> NoReturn:
     pass
 
-
+# gal
 class GradientDescent:
     """
     Gradient Descent algorithm
