@@ -3,8 +3,6 @@ from typing import NoReturn
 from ...base import BaseEstimator
 import numpy as np
 
-from ...metrics import mean_square_error
-
 
 class RidgeRegression(BaseEstimator):
     """
@@ -35,7 +33,6 @@ class RidgeRegression(BaseEstimator):
             `LinearRegression.fit` function.
         """
 
-
         """
         Initialize a ridge regression model
         :param lam: scalar value of regularization parameter
@@ -61,12 +58,13 @@ class RidgeRegression(BaseEstimator):
         -----
         Fits model with or without an intercept depending on value of `self.include_intercept_`
         """
+        I = np.eye(X.shape[1] + int(self.include_intercept_))
         if self.include_intercept_:
-            X = np.insert(X, 0, np.ones(np.shape(X)[0]), axis=1)
-        lambda_matrix = np.identity(len(X[0])) * (self.lam_ ** 0.5)
-        y = np.concatenate((y, np.zeros(len(X[0]))))
-        X = np.vstack((X, lambda_matrix))
-        self.coefs_ = np.linalg.pinv(X) @ y
+            X = np.c_[np.ones(len(X)), X]
+            I[0, 0] = 0
+
+        avg_xt = X.T / len(X)
+        self.coefs_ = np.linalg.solve(avg_xt @ X + (self.lam_ + 1e-12) * I, avg_xt @ y)
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -82,10 +80,8 @@ class RidgeRegression(BaseEstimator):
         responses : ndarray of shape (n_samples, )
             Predicted responses of given samples
         """
-        # intercept = []
         if self.include_intercept_:
-            # intercept = np.ones((np.shape(X)[0]),dtype=X.dtype)
-            X = np.insert(X, 0, np.ones(np.shape(X)[0]),axis=1)
+            X = np.c_[np.ones(len(X)), X]
         return X @ self.coefs_
 
     def _loss(self, X: np.ndarray, y: np.ndarray) -> float:
@@ -105,5 +101,5 @@ class RidgeRegression(BaseEstimator):
         loss : float
             Performance under MSE loss function
         """
-        y_hat = self.predict(X)
-        return mean_square_error(y,y_hat) + (self.lam_* (np.linalg.norm(self.coefs_))**2)
+        from ...metrics import mean_square_error
+        return mean_square_error(y, self._predict(X))
