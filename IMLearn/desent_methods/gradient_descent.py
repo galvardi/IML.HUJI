@@ -3,7 +3,7 @@ from typing import Callable, NoReturn
 import numpy as np
 
 from IMLearn.base import BaseModule, BaseLR
-from .learning_rate import FixedLR
+from IMLearn.desent_methods.learning_rate import FixedLR
 
 OUTPUT_VECTOR_TYPE = ["last", "best", "average"]
 
@@ -11,7 +11,7 @@ OUTPUT_VECTOR_TYPE = ["last", "best", "average"]
 def default_callback(model: GradientDescent, **kwargs) -> NoReturn:
     pass
 
-# gal
+
 class GradientDescent:
     """
     Gradient Descent algorithm
@@ -39,12 +39,14 @@ class GradientDescent:
         Callable function should receive as input a GradientDescent instance, and any additional
         arguments specified in the `GradientDescent.fit` function
     """
+
     def __init__(self,
                  learning_rate: BaseLR = FixedLR(1e-3),
                  tol: float = 1e-5,
                  max_iter: int = 1000,
                  out_type: str = "last",
-                 callback: Callable[[GradientDescent, ...], None] = default_callback):
+                 callback: Callable[
+                     [GradientDescent, ...], None] = default_callback):
         """
         Instantiate a new instance of the GradientDescent class
 
@@ -119,4 +121,33 @@ class GradientDescent:
                 Euclidean norm of w^(t)-w^(t-1)
 
         """
-        raise NotImplementedError()
+        t = 1
+        cur_w = f.weights
+        # prev_w = cur_w*3
+        avg_w = f.weights
+        best_w = f.weights
+        delta = 3
+        best_w_comp = f.compute_output(X=X, y=y)
+        while t <= self.max_iter_:
+            if delta < self.tol_:
+                break
+            prev_w = f.weights
+            f.weights = prev_w - (self.learning_rate_.lr_step(t=t + 1)
+                                  * f.compute_jacobian(X=X, y=y))
+            f_comp = f.compute_output(X=X, y=y)
+            if f_comp < best_w_comp:
+                best_w_comp = f_comp
+                best_w = f.weights
+            avg_w += f.weights
+            delta = np.linalg.norm(f.weights - prev_w)
+            self.callback_(self,
+                           [f.weights, f_comp, f.compute_jacobian(X=X, y=y),
+                            t,
+                            self.learning_rate_.lr_step(t=t), delta])
+            t += 1
+        if self.out_type_ == OUTPUT_VECTOR_TYPE[0]:
+            return f.weights
+        if self.out_type_ == OUTPUT_VECTOR_TYPE[1]:
+            return best_w
+        else:
+            return avg_w / t if t != 0 else 1
